@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from 'react';
-import { BookOpen, FolderKey, Settings, Star, TrendingUp, Clock, Library } from 'lucide-react';
+import { BookOpen, FolderKey, Settings, Clock, Library, Eye, BarChart3, Lightbulb } from 'lucide-react';
 
-export default function Sidebar() {
-    const [activeTab, setActiveTab] = useState('Reading Queue');
+export interface Project {
+    id: number;
+    name: string;
+}
 
-    const handleNavClick = (e: React.MouseEvent, tabName: string) => {
-        e.preventDefault();
-        setActiveTab(tabName);
-    };
+interface SidebarProps {
+    activeFilter: string;
+    onFilterChange: (filter: string) => void;
+    projects: Project[];
+}
 
+export default function Sidebar({ activeFilter, onFilterChange, projects }: SidebarProps) {
     return (
         <div className="sidebar">
             <div className="nav-logo">
@@ -21,36 +24,66 @@ export default function Sidebar() {
             <div style={{ padding: '0 16px', marginBottom: '8px', marginTop: '16px' }}>
                 <h3 className="subtitle">Menu</h3>
             </div>
-            <a href="#" className={`nav-item ${activeTab === 'Reading Queue' ? 'active' : ''}`} onClick={(e) => handleNavClick(e, 'Reading Queue')}>
+            <button
+                className={`nav-item ${activeFilter === 'unread' ? 'active' : ''}`}
+                onClick={() => onFilterChange('unread')}
+            >
                 <Clock size={20} />
                 Reading Queue
-            </a>
-            <a href="#" className={`nav-item ${activeTab === 'All Papers' ? 'active' : ''}`} onClick={(e) => handleNavClick(e, 'All Papers')}>
+            </button>
+            <button
+                className={`nav-item ${activeFilter === 'all' ? 'active' : ''}`}
+                onClick={() => onFilterChange('all')}
+            >
                 <BookOpen size={20} />
                 All Papers
-            </a>
-            <a href="#" className={`nav-item ${activeTab === 'Favorites' ? 'active' : ''}`} onClick={(e) => handleNavClick(e, 'Favorites')}>
-                <Star size={20} />
-                Favorites
+            </button>
+            <button
+                className={`nav-item ${activeFilter === 'read' ? 'active' : ''}`}
+                onClick={() => onFilterChange('read')}
+            >
+                <Eye size={20} />
+                Read
+            </button>
+            <a
+                href="/dashboard/discover"
+                className={`nav-item ${activeFilter === 'discover' ? 'active' : ''}`}
+                style={{ textDecoration: 'none' }}
+            >
+                <Lightbulb size={20} />
+                Discover
             </a>
 
-            <div style={{ padding: '0 16px', marginBottom: '8px', marginTop: '24px' }}>
-                <h3 className="subtitle">Folders</h3>
-            </div>
-            <a href="#" className={`nav-item ${activeTab === 'Thesis Chapter 1' ? 'active' : ''}`} onClick={(e) => handleNavClick(e, 'Thesis Chapter 1')}>
-                <FolderKey size={20} />
-                Thesis Chapter 1
-            </a>
-            <a href="#" className={`nav-item ${activeTab === 'Literature Review' ? 'active' : ''}`} onClick={(e) => handleNavClick(e, 'Literature Review')}>
-                <FolderKey size={20} />
-                Literature Review
-            </a>
+            {projects.length > 0 && (
+                <>
+                    <div style={{ padding: '0 16px', marginBottom: '8px', marginTop: '24px' }}>
+                        <h3 className="subtitle">Projects</h3>
+                    </div>
+                    {projects.map(project => (
+                        <button
+                            key={project.id}
+                            className={`nav-item ${activeFilter === `project-${project.id}` ? 'active' : ''}`}
+                            onClick={() => onFilterChange(`project-${project.id}`)}
+                        >
+                            <FolderKey size={20} />
+                            {project.name}
+                        </button>
+                    ))}
+                </>
+            )}
 
-            <div style={{ marginTop: 'auto', marginBottom: '16px' }}>
-                <a href="#" className={`nav-item ${activeTab === 'Settings' ? 'active' : ''}`} onClick={(e) => handleNavClick(e, 'Settings')}>
+            <div style={{ marginTop: 'auto', marginBottom: '16px', display: 'flex', flexDirection: 'column' }}>
+                <a href="/dashboard/analytics" className="nav-item" style={{ textDecoration: 'none' }}>
+                    <BarChart3 size={20} />
+                    Analytics
+                </a>
+                <button
+                    className={`nav-item ${activeFilter === 'settings' ? 'active' : ''}`}
+                    onClick={() => onFilterChange('settings')}
+                >
                     <Settings size={20} />
                     Settings
-                </a>
+                </button>
             </div>
         </div>
     );

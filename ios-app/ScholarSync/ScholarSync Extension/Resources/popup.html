@@ -5,7 +5,7 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      width: 300px;
+      width: 320px;
       margin: 0;
       padding: 16px;
       background-color: #f8fafc;
@@ -14,7 +14,7 @@
     .header {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
       margin-bottom: 16px;
     }
     .title {
@@ -22,12 +22,28 @@
       font-weight: 600;
       margin: 0;
     }
+    .user-info {
+      font-size: 11px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logout-link {
+      color: #3b82f6;
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      font-size: 11px;
+      padding: 0;
+    }
     .info-box {
       background: white;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       padding: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     .label {
@@ -51,6 +67,7 @@
       font-weight: 600;
       cursor: pointer;
       transition: background-color 0.2s;
+      font-size: 14px;
     }
     .btn-save:hover {
       background-color: #2563eb;
@@ -59,20 +76,77 @@
       background-color: #94a3b8;
       cursor: not-allowed;
     }
-    .missing-info {
+    .error-msg {
       color: #ef4444;
       font-size: 13px;
       text-align: center;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #334155;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus {
+      border-color: #3b82f6;
+    }
+    .login-error {
+      color: #ef4444;
+      font-size: 12px;
+      margin-bottom: 8px;
+      display: none;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 16px 0;
     }
   </style>
 </head>
 <body>
   <div class="header">
     <h1 class="title">ScholarSync</h1>
+    <div id="user-bar" class="user-info" style="display: none;">
+      <span id="user-email"></span>
+      <button class="logout-link" id="logout-btn">Logout</button>
+    </div>
   </div>
-  
-  <div id="loading">Scanning for papers...</div>
-  
+
+  <!-- Login Section -->
+  <div id="login" style="display: none;">
+    <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Sign in to save papers to your reading queue.</p>
+    <div id="login-error" class="login-error"></div>
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-input" type="email" id="email" placeholder="you@example.com" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-input" type="password" id="password" placeholder="Password" required>
+      </div>
+      <button type="submit" class="btn-save" id="login-btn">Sign In</button>
+    </form>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" style="display: none;">Scanning page for papers...</div>
+
+  <!-- Paper Content (authenticated + paper found) -->
   <div id="content" style="display: none;">
     <div class="info-box">
       <span class="label">Title</span>
@@ -82,11 +156,16 @@
       <span class="label">Identifier</span>
       <div id="paper-id" class="value"></div>
     </div>
-    
+    <div id="paper-authors-box" class="info-box" style="display: none;">
+      <span class="label">Authors</span>
+      <div id="paper-authors" class="value"></div>
+    </div>
+
     <button id="save-btn" class="btn-save">Save to Reading Queue</button>
   </div>
-  
-  <div id="error" class="missing-info" style="display: none;">
+
+  <!-- No Paper Found -->
+  <div id="error" class="error-msg" style="display: none;">
     No scholarly paper detected on this page.
   </div>
 
