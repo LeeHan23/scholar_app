@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import Sidebar, { Project } from '../../components/Sidebar';
 import PaperCard, { Paper } from '../../components/PaperCard';
 import RecommendationsPanel from '../../components/RecommendationsPanel';
-import { Search, Plus } from 'lucide-react';
+import ProjectShareModal from '../../components/ProjectShareModal';
+import PendingInvitations from '../../components/PendingInvitations';
+import { Search, Plus, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import AddPaperModal from '../../components/AddPaperModal';
 
@@ -16,12 +18,16 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('unread');
+  const [shareModalProject, setShareModalProject] = useState<{ id: number; name: string } | null>(null);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      setAccessToken(session?.access_token ?? '');
       if (session?.user) {
         fetchPapers();
         fetchProjects();
@@ -64,7 +70,7 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name')
+        .select('id, name, user_id')
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -297,6 +303,8 @@ export default function Home() {
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
         projects={projects}
+        onShareProject={setShareModalProject}
+        currentUserId={user?.id}
       />
       <main className="main-content">
         <header className="header-actions">
@@ -327,6 +335,15 @@ export default function Home() {
             </button>
           </div>
         </header>
+
+        {/* Pending group invitations banner */}
+        {user?.email && (
+          <PendingInvitations
+            userId={user.id}
+            userEmail={user.email}
+            onAccepted={fetchProjects}
+          />
+        )}
 
         {errorMsg && (
           <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.85rem' }}>
@@ -374,6 +391,18 @@ export default function Home() {
           onSave={handleSavePaper}
           initialData={editingPaper}
         />
+
+        {/* Project share modal */}
+        {shareModalProject && user && (
+          <ProjectShareModal
+            project={shareModalProject}
+            currentUserId={user.id}
+            currentUserEmail={user.email ?? ''}
+            supabaseUrl={supabaseUrl}
+            accessToken={accessToken}
+            onClose={() => setShareModalProject(null)}
+          />
+        )}
       </main>
     </div>
   );

@@ -165,6 +165,13 @@ class SupabaseManager {
         accessToken = nil
         refreshToken = nil
         currentUserId = nil
+        currentUserEmail = nil
+    }
+
+    // Email is not sensitive — store in UserDefaults for easy access
+    var currentUserEmail: String? {
+        get { UserDefaults.standard.string(forKey: "supabase_user_email") }
+        set { UserDefaults.standard.set(newValue, forKey: "supabase_user_email") }
     }
 
     private func saveAuth(_ auth: AuthResponse) {
@@ -172,6 +179,7 @@ class SupabaseManager {
         refreshToken = auth.refresh_token
         if let user = auth.user {
             currentUserId = user.id
+            currentUserEmail = user.email
         }
     }
 
@@ -390,6 +398,115 @@ class SupabaseManager {
         let safeId = try validatedId(id)
         let (_, httpResponse) = try await executeWithRefresh(path: "projects", method: "DELETE", queryParams: "id=eq.\(safeId)")
 
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 204 else {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    // MARK: - Project Members (Collaboration)
+
+    func fetchProjectMembers(projectId: Int) async throws -> [ProjectMember] {
+        let safeId = try validatedId(projectId)
+        let (data, httpResponse) = try await executeWithRefresh(
+            path: "project_members",
+            queryParams: "project_id=eq.\(safeId)&select=*&order=created_at.asc"
+        )
+        guard httpResponse.statusCode == 200 else {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+        return try JSONDecoder().decode([ProjectMember].self, from: data)
+    }
+
+    func inviteMember(projectId: Int, email: String, role: ProjectMember.MemberRole) async throws -> ProjectMember {
+        guard let token = accessToken else {
+            throw SupabaseError.notAuthenticated
+        }
+        let urlString = "\(baseURL)/functions/v1/invite-member"
+        guard let url = URL(string: urlString) else {
+            throw SupabaseError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 15
+        let body: [String: Any] = ["projectId": projectId, "invitedEmail": email, "role": role.rawValue]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.invalidResponse
+        }
+        print("[SupabaseManager] invite-member → \(httpResponse.statusCode)")
+        guard httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            print("[SupabaseManager] Invite error: \(body)")
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+        struct InviteResponse: Codable {
+            let success: Bool
+            let member: ProjectMember
+        }
+        let result = try JSONDecoder().decode(InviteResponse.self, from: data)
+        return result.member
+    }
+
+    func fetchPendingInvitations() async throws -> [ProjectMember] {
+        guard let email = currentUserEmail, !email.isEmpty else { return [] }
+        // percent-encode the email for use in query param
+        let encoded = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? email
+        let (data, httpResponse) = try await executeWithRefresh(
+            path: "project_members",
+            queryParams: "accepted=eq.false&invited_email=eq.\(encoded)&select=*,projects(name,user_id)"
+        )
+        guard httpResponse.statusCode == 200 else {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+        return try JSONDecoder().decode([ProjectMember].self, from: data)
+    }
+
+    func acceptInvitation(memberId: Int) async throws {
+        guard let userId = currentUserId else {
+            throw SupabaseError.notAuthenticated
+        }
+        let safeId = try validatedId(memberId)
+        let rawBody = "{\"accepted\":true,\"user_id\":\"\(userId)\"}".data(using: .utf8)!
+        let (_, httpResponse) = try await executeWithRefresh(
+            path: "project_members",
+            method: "PATCH",
+            body: rawBody,
+            queryParams: "id=eq.\(safeId)"
+        )
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 204 else {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    func declineInvitation(memberId: Int) async throws {
+        try await removeCollaborator(memberId: memberId)
+    }
+
+    func removeCollaborator(memberId: Int) async throws {
+        let safeId = try validatedId(memberId)
+        let (_, httpResponse) = try await executeWithRefresh(
+            path: "project_members",
+            method: "DELETE",
+            queryParams: "id=eq.\(safeId)"
+        )
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 204 else {
+            throw SupabaseError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    func updateMemberRole(memberId: Int, role: ProjectMember.MemberRole) async throws {
+        let safeId = try validatedId(memberId)
+        let rawBody = "{\"role\":\"\(role.rawValue)\"}".data(using: .utf8)!
+        let (_, httpResponse) = try await executeWithRefresh(
+            path: "project_members",
+            method: "PATCH",
+            body: rawBody,
+            queryParams: "id=eq.\(safeId)"
+        )
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 204 else {
             throw SupabaseError.httpError(httpResponse.statusCode)
         }

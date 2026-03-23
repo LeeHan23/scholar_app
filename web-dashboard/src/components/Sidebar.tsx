@@ -1,19 +1,22 @@
 "use client";
 
-import { BookOpen, FolderKey, Settings, Clock, Library, Eye, BarChart3, Lightbulb } from 'lucide-react';
+import { BookOpen, FolderKey, Settings, Clock, Library, Eye, BarChart3, Lightbulb, Share2 } from 'lucide-react';
 
 export interface Project {
     id: number;
     name: string;
+    user_id?: string;
 }
 
 interface SidebarProps {
     activeFilter: string;
     onFilterChange: (filter: string) => void;
     projects: Project[];
+    onShareProject?: (project: { id: number; name: string }) => void;
+    currentUserId?: string;
 }
 
-export default function Sidebar({ activeFilter, onFilterChange, projects }: SidebarProps) {
+export default function Sidebar({ activeFilter, onFilterChange, projects, onShareProject, currentUserId }: SidebarProps) {
     return (
         <div className="sidebar">
             <div className="nav-logo">
@@ -60,14 +63,27 @@ export default function Sidebar({ activeFilter, onFilterChange, projects }: Side
                         <h3 className="subtitle">Projects</h3>
                     </div>
                     {projects.map(project => (
-                        <button
-                            key={project.id}
-                            className={`nav-item ${activeFilter === `project-${project.id}` ? 'active' : ''}`}
-                            onClick={() => onFilterChange(`project-${project.id}`)}
-                        >
-                            <FolderKey size={20} />
-                            {project.name}
-                        </button>
+                        <div key={project.id} style={{ display: 'flex', alignItems: 'center' }}>
+                            <button
+                                className={`nav-item ${activeFilter === `project-${project.id}` ? 'active' : ''}`}
+                                onClick={() => onFilterChange(`project-${project.id}`)}
+                                style={{ flex: 1 }}
+                            >
+                                <FolderKey size={20} />
+                                {project.name}
+                            </button>
+                            {onShareProject && project.user_id === currentUserId && (
+                                <button
+                                    onClick={e => { e.stopPropagation(); onShareProject({ id: project.id, name: project.name }); }}
+                                    title="Share project"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', color: 'var(--text-secondary)', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                                    onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                                    onMouseOut={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                                >
+                                    <Share2 size={14} />
+                                </button>
+                            )}
+                        </div>
                     ))}
                 </>
             )}

@@ -8,6 +8,8 @@ class QueueViewModel: ObservableObject {
     @Published var projects: [Project] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var pendingInvitations: [ProjectMember] = []
+    @Published var projectMembers: [Int: [ProjectMember]] = [:]
 
     private let supabase = SupabaseManager.shared
     private let offline = OfflineManager.shared
@@ -29,6 +31,8 @@ class QueueViewModel: ObservableObject {
                 // Cache for offline use
                 offline.cachePapers(papers)
                 offline.cacheProjects(projects)
+
+                await loadPendingInvitations()
             } catch {
                 // Fall back to cached data
                 papers = offline.getCachedPapers()
@@ -196,6 +200,78 @@ class QueueViewModel: ObservableObject {
             await updatePaper(updated)
         } catch {
             errorMessage = "PDF upload failed: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Collaboration
+
+    func loadPendingInvitations() async {
+        do {
+            pendingInvitations = try await supabase.fetchPendingInvitations()
+        } catch {
+            print("[QueueViewModel] Failed to load invitations: \(error)")
+        }
+    }
+
+    func loadMembers(for project: Project) async {
+        guard let id = project.id else { return }
+        do {
+            let members = try await supabase.fetchProjectMembers(projectId: id)
+            projectMembers[id] = members
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func inviteMember(to project: Project, email: String, role: ProjectMember.MemberRole) async throws {
+        guard let id = project.id else { return }
+        let member = try await supabase.inviteMember(projectId: id, email: email, role: role)
+        projectMembers[id, default: []].append(member)
+    }
+
+    func acceptInvitation(_ invitation: ProjectMember) async {
+        guard let id = invitation.id else { return }
+        do {
+            try await supabase.acceptInvitation(memberId: id)
+            pendingInvitations.removeAll { $0.id == id }
+            // Reload projects so the newly shared project appears
+            if offline.isOnline {
+                do { projects = try await supabase.fetchProjects() } catch {}
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func declineInvitation(_ invitation: ProjectMember) async {
+        guard let id = invitation.id else { return }
+        do {
+            try await supabase.declineInvitation(memberId: id)
+            pendingInvitations.removeAll { $0.id == id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func removeCollaborator(_ member: ProjectMember, from project: Project) async {
+        guard let memberId = member.id, let projectId = project.id else { return }
+        do {
+            try await supabase.removeCollaborator(memberId: memberId)
+            projectMembers[projectId]?.removeAll { $0.id == memberId }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateMemberRole(_ member: ProjectMember, role: ProjectMember.MemberRole, in project: Project) async {
+        guard let memberId = member.id, let projectId = project.id else { return }
+        do {
+            try await supabase.updateMemberRole(memberId: memberId, role: role)
+            if let idx = projectMembers[projectId]?.firstIndex(where: { $0.id == memberId }) {
+                projectMembers[projectId]?[idx].role = role
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

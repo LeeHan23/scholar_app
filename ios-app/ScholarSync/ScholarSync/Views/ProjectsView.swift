@@ -6,10 +6,35 @@ struct ProjectsView: View {
     @State private var newProjectName = ""
     @State private var editingProject: Project?
     @State private var editProjectName = ""
+    @State private var sharingProject: Project?
+    @State private var showingInvitations = false
+
+    private var currentUserId: String {
+        SupabaseManager.shared.currentUserId ?? ""
+    }
 
     var body: some View {
         NavigationView {
             List {
+                // Pending invitations banner
+                if !viewModel.pendingInvitations.isEmpty {
+                    Button(action: { showingInvitations = true }) {
+                        HStack {
+                            Image(systemName: "person.2.fill")
+                                .foregroundColor(.orange)
+                            Text("\(viewModel.pendingInvitations.count) pending group invitation\(viewModel.pendingInvitations.count == 1 ? "" : "s")")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.orange)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listRowBackground(Color.orange.opacity(0.08))
+                }
+
                 if viewModel.projects.isEmpty && !viewModel.isLoading {
                     VStack(alignment: .center, spacing: 16) {
                         Image(systemName: "folder.badge.plus")
@@ -29,12 +54,14 @@ struct ProjectsView: View {
                     ForEach(viewModel.projects) { project in
                         NavigationLink(destination: ProjectDetailView(project: project)) {
                             HStack {
-                                Image(systemName: "folder.fill")
-                                    .foregroundColor(.blue)
+                                let isShared = (viewModel.projectMembers[project.id ?? -1]?.count ?? 0) > 1
+                                Image(systemName: isShared ? "person.2.fill" : "folder.fill")
+                                    .foregroundColor(isShared ? .purple : .blue)
                                 VStack(alignment: .leading) {
                                     Text(project.name)
                                         .font(.headline)
-                                    Text("\(viewModel.papersForProject(project).count) papers")
+                                    let memberCount = viewModel.projectMembers[project.id ?? -1]?.count ?? 0
+                                    Text("\(viewModel.papersForProject(project).count) papers\(memberCount > 1 ? " · \(memberCount) members" : "")")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -54,6 +81,13 @@ struct ProjectsView: View {
                                 Label("Rename", systemImage: "pencil")
                             }
                             .tint(.orange)
+
+                            Button {
+                                sharingProject = project
+                            } label: {
+                                Label("Share", systemImage: "person.badge.plus")
+                            }
+                            .tint(.purple)
                         }
                     }
                 }
@@ -89,6 +123,14 @@ struct ProjectsView: View {
                     }
                     editingProject = nil
                 }
+            }
+            .sheet(item: $sharingProject) { project in
+                ProjectShareView(project: project, currentUserId: currentUserId)
+                    .environmentObject(viewModel)
+            }
+            .sheet(isPresented: $showingInvitations) {
+                PendingInvitationsView()
+                    .environmentObject(viewModel)
             }
         }
     }

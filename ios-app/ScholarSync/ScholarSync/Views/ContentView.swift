@@ -16,6 +16,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Projects", systemImage: "folder")
                 }
+                .badge(viewModel.pendingInvitations.count > 0 ? viewModel.pendingInvitations.count : 0)
         }
         .task {
             await viewModel.loadData()
