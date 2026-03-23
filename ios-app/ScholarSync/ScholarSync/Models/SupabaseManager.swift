@@ -448,7 +448,7 @@ class SupabaseManager {
             throw SupabaseError.notAuthenticated
         }
 
-        let urlString = "\(baseURL)/storage/v1/object/sign/papers/\(path)"
+        let urlString = "\(baseURL)/storage/v1/object/sign/papers"
         guard let url = URL(string: urlString) else {
             throw SupabaseError.invalidURL
         }
@@ -459,10 +459,14 @@ class SupabaseManager {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
-        request.httpBody = try JSONEncoder().encode(["expiresIn": 3600])
+
+        let body: [String: Any] = ["expiresIn": 3600, "path": path]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            print("[SupabaseManager] Sign URL error: \(body)")
             throw SupabaseError.invalidResponse
         }
 
